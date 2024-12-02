@@ -1,48 +1,5 @@
 const std = @import("std");
 
-fn insertion_sort(arr: []u32) void {
-    for (1..arr.len) |i| {
-        // loop invariant: arr[0..i] is sorted
-        const key = arr[i];
-        var j: i32 = @intCast(i - 1);
-        while (j >= 0 and arr[@intCast(j)] > key) {
-            // arr[0..j] is sorted, arr[j..i]
-            arr[@intCast(j + 1)] = arr[@intCast(j)];
-            j -= 1;
-        }
-
-        // arr[j] <= key
-        arr[@intCast(j + 1)] = key;
-    }
-}
-
-const InputLists = struct {
-    list1: [1000]u32,
-    list2: [1000]u32,
-};
-
-fn read_input() !InputLists {
-    const file = try std.fs.cwd().openFile("input.txt", .{});
-    defer file.close();
-
-    var buf_reader = std.io.bufferedReader(file.reader());
-    var in_stream = buf_reader.reader();
-
-    var buf: [1024]u8 = undefined;
-    var list1 = [_]u32{0} ** 1000;
-    var list2 = [_]u32{0} ** 1000;
-    var i: usize = 0;
-    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        const num1 = try std.fmt.parseUnsigned(u32, line[0..5], 10);
-        const num2 = try std.fmt.parseUnsigned(u32, line[8..13], 10);
-        list1[i] = num1;
-        list2[i] = num2;
-        i += 1;
-    }
-
-    return InputLists{ .list1 = list1, .list2 = list2 };
-}
-
 fn hashUint(val: u32) u32 {
     var result = val;
     // FNV-1a inspired hash
@@ -116,7 +73,50 @@ pub const HashTable = struct {
     }
 };
 
-fn part_one() !void {
+fn insertion_sort(arr: []u32) void {
+    for (1..arr.len) |i| {
+        // loop invariant: arr[0..i] is sorted
+        const key = arr[i];
+        var j: i32 = @intCast(i - 1);
+        while (j >= 0 and arr[@intCast(j)] > key) {
+            // arr[0..j] is sorted, arr[j..i]
+            arr[@intCast(j + 1)] = arr[@intCast(j)];
+            j -= 1;
+        }
+
+        // arr[j] <= key
+        arr[@intCast(j + 1)] = key;
+    }
+}
+
+const InputLists = struct {
+    list1: [1000]u32,
+    list2: [1000]u32,
+};
+
+fn read_input() !InputLists {
+    const file = try std.fs.cwd().openFile("inputs/01.txt", .{});
+    defer file.close();
+
+    var buf_reader = std.io.bufferedReader(file.reader());
+    var in_stream = buf_reader.reader();
+
+    var buf: [1024]u8 = undefined;
+    var list1 = [_]u32{0} ** 1000;
+    var list2 = [_]u32{0} ** 1000;
+    var i: usize = 0;
+    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+        const num1 = try std.fmt.parseUnsigned(u32, line[0..5], 10);
+        const num2 = try std.fmt.parseUnsigned(u32, line[8..13], 10);
+        list1[i] = num1;
+        list2[i] = num2;
+        i += 1;
+    }
+
+    return InputLists{ .list1 = list1, .list2 = list2 };
+}
+
+fn d1_part_one() !void {
     const input = read_input() catch |err| {
         std.debug.print("Failed to read input: {any}\n", .{err});
         std.process.exit(1);
@@ -135,7 +135,7 @@ fn part_one() !void {
     std.debug.print("{}", .{total});
 }
 
-fn part_two() !void {
+fn d1_part_two() !void {
     const input = read_input() catch |err| {
         std.debug.print("Failed to read input: {any}\n", .{err});
         std.process.exit(1);
@@ -165,7 +165,8 @@ fn part_two() !void {
 }
 
 pub fn main() !void {
-    try part_one();
-    std.debug.print("\n\n", .{});
-    try part_two();
+    std.debug.print("Day 01: \n", .{});
+    try d1_part_one();
+    std.debug.print("\n", .{});
+    try d1_part_two();
 }

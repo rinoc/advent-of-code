@@ -1,0 +1,7 @@
+*.o
+.DS_Store
+*.dSYM
+.vscode
+.zig-cache
+sol
+sol.o
