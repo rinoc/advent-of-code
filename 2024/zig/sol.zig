@@ -1,5 +1,7 @@
 const std = @import("std");
+const expect = std.testing.expect;
 
+/// Helpers
 fn hashUint(val: u32) u32 {
     var result = val;
     // FNV-1a inspired hash
@@ -89,6 +91,7 @@ fn insertion_sort(arr: []u32) void {
     }
 }
 
+/// Day One
 const InputLists = struct {
     list1: [1000]u32,
     list2: [1000]u32,
@@ -164,8 +167,7 @@ fn d1_part_two() !void {
     std.debug.print("{}", .{total});
 }
 
-// Day Two
-
+/// Day Two
 fn absInt(x: anytype) @TypeOf(x) {
     const T = @TypeOf(x);
     if (@typeInfo(T) != .Int) @compileError("abs requires integer type");
@@ -208,7 +210,6 @@ fn d2_is_safe(nums: []const i16) bool {
 
     return (increasing or decreasing) and diff_check;
 }
-const expect = std.testing.expect;
 
 test "d2_is_safe specified test cases" {
     // "7 6 4 2 1": Safe because the levels are all decreasing by 1 or 2
@@ -293,6 +294,61 @@ fn d2_part_two() !void {
     std.debug.print("{}", .{num_safe});
 }
 
+/// Day Three
+///
+fn is_digit(c: u8) bool {
+    return c >= '0' and c <= '9';
+}
+fn d3_part_one_(input: []const u8) u32 {
+    var total: u32 = 0;
+
+    var current: usize = 0;
+    const input_len = input.len;
+    while (current < input_len) {
+        if (current + 4 < input.len and std.mem.eql(u8, input[current .. current + 4], "mul(")) {
+            current += 4;
+            var one: u32 = 0;
+            while (is_digit(input[current])) {
+                one = 10 * one + (input[current] - '0');
+                current += 1;
+            }
+            if (input[current] != ',') {
+                continue;
+            }
+            current += 1;
+            var two: u32 = 0;
+            while (is_digit(input[current])) {
+                two = 10 * two + (input[current] - '0');
+                current += 1;
+            }
+            if (input[current] != ')') {
+                continue;
+            }
+
+            total += one * two;
+            continue;
+        }
+
+        current += 1;
+    }
+
+    return total;
+}
+
+test "day three: find mul sums" {
+    try expect(d3_part_one_("xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))") == 161);
+}
+
+fn d3_part_one() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const content = try std.fs.cwd().readFileAlloc(allocator, "inputs/03.txt", 1000000);
+    defer allocator.free(content);
+    std.debug.print("{}", .{d3_part_one_(content)});
+}
+
 pub fn main() !void {
     std.debug.print("Day 01: \n", .{});
     try d1_part_one();
@@ -303,4 +359,7 @@ pub fn main() !void {
     try d2_part_one();
     std.debug.print("\n", .{});
     try d2_part_two();
+
+    std.debug.print("\n\nDay 03: \n", .{});
+    try d3_part_one();
 }
