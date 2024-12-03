@@ -164,9 +164,143 @@ fn d1_part_two() !void {
     std.debug.print("{}", .{total});
 }
 
+// Day Two
+
+fn absInt(x: anytype) @TypeOf(x) {
+    const T = @TypeOf(x);
+    if (@typeInfo(T) != .Int) @compileError("abs requires integer type");
+
+    return if (x >= 0) x else -x;
+}
+
+fn d2_is_safe(nums: []const i16) bool {
+    var window_iterator = std.mem.window(i16, nums, 2, 1);
+
+    // increasing
+    var increasing = true;
+    while (window_iterator.next()) |pair| {
+        if (pair[1] <= pair[0]) {
+            increasing = false;
+            break;
+        }
+    }
+
+    window_iterator = std.mem.window(i16, nums, 2, 1);
+
+    var decreasing = true;
+    while (window_iterator.next()) |pair| {
+        if (pair[0] <= pair[1]) {
+            decreasing = false;
+            break;
+        }
+    }
+
+    window_iterator = std.mem.window(i16, nums, 2, 1);
+
+    var diff_check = true;
+    while (window_iterator.next()) |pair| {
+        const diff = absInt(pair[0] - pair[1]);
+        if (diff == 0 or diff > 3) {
+            diff_check = false;
+            break;
+        }
+    }
+
+    return (increasing or decreasing) and diff_check;
+}
+const expect = std.testing.expect;
+
+test "d2_is_safe specified test cases" {
+    // "7 6 4 2 1": Safe because the levels are all decreasing by 1 or 2
+    try expect(d2_is_safe(&[_]i16{ 7, 6, 4, 2, 1 }));
+
+    // "1 2 7 8 9": Unsafe because 2 7 is an increase of 5
+    try expect(!d2_is_safe(&[_]i16{ 1, 2, 7, 8, 9 }));
+
+    // "9 7 6 2 1": Unsafe because 6 2 is a decrease of 4
+    try expect(!d2_is_safe(&[_]i16{ 9, 7, 6, 2, 1 }));
+
+    // "1 3 2 4 5": Unsafe because 1 3 is increasing but 3 2 is decreasing
+    try expect(!d2_is_safe(&[_]i16{ 1, 3, 2, 4, 5 }));
+
+    // "8 6 4 4 1": Unsafe because 4 4 is neither an increase or decrease
+    try expect(!d2_is_safe(&[_]i16{ 8, 6, 4, 4, 1 }));
+
+    // "1 3 6 7 9": Safe because the levels are all increasing by 1, 2, or 3
+    try expect(d2_is_safe(&[_]i16{ 1, 3, 6, 7, 9 }));
+}
+
+fn d2_line_to_nums(allocator: std.mem.Allocator, line: []const u8) ![]i16 {
+    var iterator = std.mem.split(u8, line, " ");
+    var numbers = std.ArrayList(i16).init(allocator);
+    defer numbers.deinit();
+
+    while (iterator.next()) |token| {
+        const num = try std.fmt.parseInt(i16, token, 10);
+        try numbers.append(num);
+    }
+
+    return numbers.toOwnedSlice();
+}
+
+fn d2_part_one() !void {
+    const file = try std.fs.cwd().openFile("inputs/02.txt", .{});
+    defer file.close();
+
+    var buf_reader = std.io.bufferedReader(file.reader());
+    var in_stream = buf_reader.reader();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    var buf: [1024]u8 = undefined;
+
+    var num_safe: u32 = 0;
+    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+        const nums = try d2_line_to_nums(allocator, line);
+        const is_safe = d2_is_safe(nums);
+        if (is_safe) {
+            num_safe += 1;
+        }
+    }
+
+    std.debug.print("{}", .{num_safe});
+}
+
+fn d2_part_two() !void {
+    const file = try std.fs.cwd().openFile("inputs/02.txt", .{});
+    defer file.close();
+
+    var buf_reader = std.io.bufferedReader(file.reader());
+    var in_stream = buf_reader.reader();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    var buf: [1024]u8 = undefined;
+
+    var num_safe: u32 = 0;
+    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
+        const nums = try d2_line_to_nums(allocator, line);
+        for (0..nums.len) |i| {
+            var new_slice = try allocator.alloc(i16, nums.len - 1);
+            @memcpy(new_slice[0..i], nums[0..i]);
+            @memcpy(new_slice[i..], nums[i + 1 ..]);
+            const is_safe = d2_is_safe(new_slice);
+            if (is_safe) {
+                num_safe += 1;
+                break;
+            }
+        }
+    }
+
+    std.debug.print("{}", .{num_safe});
+}
+
 pub fn main() !void {
     std.debug.print("Day 01: \n", .{});
     try d1_part_one();
     std.debug.print("\n", .{});
     try d1_part_two();
+
+    std.debug.print("\n\nDay 02: \n", .{});
+    try d2_part_one();
+    std.debug.print("\n", .{});
+    try d2_part_two();
 }
