@@ -349,6 +349,68 @@ fn d3_part_one() !void {
     std.debug.print("{}", .{d3_part_one_(content)});
 }
 
+fn d3_part_two_(input: []const u8) u32 {
+    var total: u32 = 0;
+
+    var current: usize = 0;
+    const input_len = input.len;
+    var enabled = true;
+    while (current < input_len) {
+        if (current + 4 < input.len and std.mem.eql(u8, input[current .. current + 4], "mul(")) {
+            current += 4;
+            if (!enabled) {
+                continue;
+            }
+            var one: u32 = 0;
+            while (is_digit(input[current])) {
+                one = 10 * one + (input[current] - '0');
+                current += 1;
+            }
+            if (input[current] != ',') {
+                continue;
+            }
+            current += 1;
+            var two: u32 = 0;
+            while (is_digit(input[current])) {
+                two = 10 * two + (input[current] - '0');
+                current += 1;
+            }
+            if (input[current] != ')') {
+                continue;
+            }
+
+            total += one * two;
+            continue;
+        } else if (current + 7 < input.len and std.mem.eql(u8, input[current .. current + 7], "don't()")) {
+            current += 7;
+            enabled = false;
+            continue;
+        } else if (current + 4 < input.len and std.mem.eql(u8, input[current .. current + 4], "do()")) {
+            current += 4;
+            enabled = true;
+            continue;
+        }
+
+        current += 1;
+    }
+
+    return total;
+}
+
+test "day three: part two" {
+    try expect(d3_part_two_("xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))") == 48);
+}
+
+fn d3_part_two() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const content = try std.fs.cwd().readFileAlloc(allocator, "inputs/03.txt", 1000000);
+    defer allocator.free(content);
+    std.debug.print("{}", .{d3_part_two_(content)});
+}
+
 pub fn main() !void {
     std.debug.print("Day 01: \n", .{});
     try d1_part_one();
@@ -362,4 +424,6 @@ pub fn main() !void {
 
     std.debug.print("\n\nDay 03: \n", .{});
     try d3_part_one();
+    std.debug.print("\n", .{});
+    try d3_part_two();
 }
