@@ -411,6 +411,260 @@ fn d3_part_two() !void {
     std.debug.print("{}", .{d3_part_two_(content)});
 }
 
+const Direction = enum(u3) { E, NE, N, NW, W, SW, S, SE };
+
+var DIRECTIONS = std.EnumArray(Direction, struct { dx: i2, dy: i2 }).init(.{
+    .E = .{ .dx = 1, .dy = 0 }, // Right (unchanged)
+    .NE = .{ .dx = 1, .dy = -1 }, // Right and up
+    .N = .{ .dx = 0, .dy = -1 }, // Up
+    .NW = .{ .dx = -1, .dy = -1 }, // Left and up
+    .W = .{ .dx = -1, .dy = 0 }, // Left (unchanged)
+    .SW = .{ .dx = -1, .dy = 1 }, // Left and down
+    .S = .{ .dx = 0, .dy = 1 }, // Down
+    .SE = .{ .dx = 1, .dy = 1 }, // Right and down
+});
+
+const Point = struct {
+    x: usize,
+    y: usize,
+
+    pub fn hash(self: Point) u64 {
+        var hasher = std.hash.Wyhash.init(0);
+        const xb = std.mem.asBytes(&self.x);
+        const yb = std.mem.asBytes(&self.y);
+        hasher.update(xb);
+        hasher.update(yb);
+        return hasher.final();
+    }
+
+    pub fn eql(self: Point, other: Point) bool {
+        return self.x == other.x and self.y == other.y;
+    }
+};
+
+const DirectedPoint = struct { point: Point, dir: Direction };
+const AdjPoints = struct { points: [8]DirectedPoint, len: usize };
+
+fn move_one(p: Point, dir_e: Direction, max_x: usize, max_y: usize) ?Point {
+    const dir = DIRECTIONS.get(dir_e);
+    if (dir.dx == 0 and dir.dy == 0) {
+        return p;
+    }
+    const new_x: usize = if (dir.dx < 0)
+        if (p.x == 0) {
+            return null;
+        } else p.x - @as(usize, @intCast(-dir.dx))
+    else
+        p.x + @as(usize, @intCast(dir.dx));
+
+    const new_y: usize = if (dir.dy < 0)
+        if (p.y == 0) {
+            return null;
+        } else p.y - @as(usize, @intCast(-dir.dy))
+    else
+        p.y + @as(usize, @intCast(dir.dy));
+
+    if (new_x > max_x or new_y > max_y) {
+        return null;
+    }
+
+    return Point{ .x = new_x, .y = new_y };
+}
+
+fn adj_ind(i: usize, j: usize, max_x: usize, max_y: usize) AdjPoints {
+    var points: [8]DirectedPoint = undefined;
+    var ind: usize = 0;
+    var iter = DIRECTIONS.iterator();
+    while (iter.next()) |entry| {
+        const new_point = move_one(Point{ .x = i, .y = j }, entry.key, max_x, max_y) orelse continue;
+
+        points[ind] = DirectedPoint{ .point = new_point, .dir = entry.key };
+        ind += 1;
+    }
+
+    return AdjPoints{ .points = points, .len = ind };
+}
+
+fn d4_part_one_(input: []const u8) !u32 {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var xp = std.AutoHashMap(Point, void).init(allocator);
+    defer xp.deinit();
+
+    var mp = std.AutoHashMap(Point, void).init(allocator);
+    defer mp.deinit();
+
+    var ap = std.AutoHashMap(Point, void).init(allocator);
+    defer ap.deinit();
+
+    var sp = std.AutoHashMap(Point, void).init(allocator);
+    defer sp.deinit();
+
+    var lines = std.mem.split(u8, input, "\n");
+
+    var row: usize = 0;
+    var cols: usize = 0;
+    while (lines.next()) |line| {
+        if (cols == 0) {
+            cols = line.len;
+        }
+
+        for (line, 0..) |char, col| {
+            switch (char) {
+                'X' => try xp.put(Point{ .x = row, .y = col }, {}),
+                'M' => try mp.put(Point{ .x = row, .y = col }, {}),
+                'A' => try ap.put(Point{ .x = row, .y = col }, {}),
+                'S' => try sp.put(Point{ .x = row, .y = col }, {}),
+                else => {},
+            }
+        }
+
+        row += 1;
+    }
+
+    var xiter = xp.keyIterator();
+    var total: u32 = 0;
+    while (xiter.next()) |p| {
+        const adp = adj_ind(p.*.x, p.*.y, row, cols);
+        for (0..adp.len) |i| {
+            const dir_point = adp.points[i];
+
+            const potential_m = dir_point.point;
+            const potential_a = move_one(potential_m, dir_point.dir, cols, row) orelse continue;
+            const potential_s = move_one(potential_a, dir_point.dir, cols, row) orelse continue;
+            if (mp.contains(potential_m) and ap.contains(potential_a) and sp.contains(potential_s)) {
+                // std.debug.print("found at ({}, {})\n", .{ p.x, p.y });
+                total += 1;
+            }
+        }
+    }
+
+    return total;
+}
+
+test "day 04: part one" {
+    const input =
+        \\MMMSXXMASM
+        \\MSAMXMSMSA
+        \\AMXSXMAAMM
+        \\MSAMASMSMX
+        \\XMASAMXAMM
+        \\XXAMMXXAMA
+        \\SMSMSASXSS
+        \\SAXAMASAAA
+        \\MAMMMXMMMM
+        \\MXMXAXMASX
+    ;
+
+    try expect(try d4_part_one_(input) == 18);
+}
+
+fn d4_part_one() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const content = try std.fs.cwd().readFileAlloc(allocator, "inputs/04.txt", 1000000);
+    defer allocator.free(content);
+    std.debug.print("{!}", .{d4_part_one_(content)});
+}
+
+fn getAdjDirectionPointMap(adj_points: AdjPoints) std.EnumMap(Direction, Point) {
+    var map = std.EnumMap(Direction, Point){};
+    var i: usize = 0;
+    while (i < adj_points.len) : (i += 1) {
+        const directed_point = adj_points.points[i];
+        map.put(directed_point.dir, directed_point.point);
+    }
+
+    return map;
+}
+
+fn d4_part_two_(input: []const u8) !u32 {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var xp = std.AutoHashMap(Point, void).init(allocator);
+    defer xp.deinit();
+
+    var mp = std.AutoHashMap(Point, void).init(allocator);
+    defer mp.deinit();
+
+    var ap = std.AutoHashMap(Point, void).init(allocator);
+    defer ap.deinit();
+
+    var sp = std.AutoHashMap(Point, void).init(allocator);
+    defer sp.deinit();
+
+    var lines = std.mem.split(u8, input, "\n");
+
+    var row: usize = 0;
+    var cols: usize = 0;
+    while (lines.next()) |line| {
+        if (cols == 0) {
+            cols = line.len;
+        }
+
+        for (line, 0..) |char, col| {
+            switch (char) {
+                'X' => try xp.put(Point{ .y = row, .x = col }, {}),
+                'M' => try mp.put(Point{ .y = row, .x = col }, {}),
+                'A' => try ap.put(Point{ .y = row, .x = col }, {}),
+                'S' => try sp.put(Point{ .y = row, .x = col }, {}),
+                else => {},
+            }
+        }
+
+        row += 1;
+    }
+
+    var aiter = ap.keyIterator();
+    var total: u32 = 0;
+    while (aiter.next()) |p| {
+        const adp = adj_ind(p.*.x, p.*.y, row, cols);
+        const pmap = getAdjDirectionPointMap(adp);
+
+        const up_right_1 = sp.contains(pmap.get(Direction.NE) orelse continue) and mp.contains(pmap.get(Direction.SW) orelse continue);
+        const up_right_2 = mp.contains(pmap.get(Direction.NE) orelse continue) and sp.contains(pmap.get(Direction.SW) orelse continue);
+        const up_left_1 = mp.contains(pmap.get(Direction.NW) orelse continue) and sp.contains(pmap.get(Direction.SE) orelse continue);
+        const up_left_2 = sp.contains(pmap.get(Direction.NW) orelse continue) and mp.contains(pmap.get(Direction.SE) orelse continue);
+
+        if ((up_right_1 or up_right_2) and (up_left_1 or up_left_2)) {
+            total += 1;
+        }
+    }
+
+    return total;
+}
+fn d4_part_two() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const content = try std.fs.cwd().readFileAlloc(allocator, "inputs/04.txt", 1000000);
+    defer allocator.free(content);
+    std.debug.print("{!}", .{d4_part_two_(content)});
+}
+test "day 04: part two" {
+    const input =
+        \\.M.S......
+        \\..A..MSMS.
+        \\.M.S.MAA..
+        \\..A.ASMSM.
+        \\.M.S.M....
+        \\..........
+        \\S.S.S.S.S.
+        \\.A.A.A.A..
+        \\M.M.M.M.M.
+        \\..........
+    ;
+
+    try expect(try d4_part_two_(input) == 9);
+}
+
 pub fn main() !void {
     std.debug.print("Day 01: \n", .{});
     try d1_part_one();
@@ -426,4 +680,9 @@ pub fn main() !void {
     try d3_part_one();
     std.debug.print("\n", .{});
     try d3_part_two();
+
+    std.debug.print("\n\nDay 04: \n", .{});
+    try d4_part_one();
+    std.debug.print("\n", .{});
+    try d4_part_two();
 }
